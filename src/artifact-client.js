@@ -10,6 +10,12 @@ const argv = require('yargs')
     description: 'download',
     type: 'boolean'
   })
+  .option('retentionDays', {
+    alias: 'r',
+    description: 'retention days',
+    type: 'number',
+    default: 1
+  })
   .positional('artifactName', {
     type: 'string',
     describe: 'artifact name',
@@ -23,7 +29,9 @@ if (argv.upload) {
   const ExtendedUploadHttpClient = require('./upload-http-client.js')
   console.log(ExtendedUploadHttpClient)
   const uploadHttpClient = new ExtendedUploadHttpClient()
-  uploadHttpClient.uploadStream(artifactName, process.stdin, {retentionDays: 1})
+  uploadHttpClient.uploadStream(artifactName, process.stdin, {
+    retentionDays: argv.retentionDays
+  })
 } else if (argv.download) {
   console.error('Not implemented.')
 } else {
