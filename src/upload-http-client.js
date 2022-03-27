@@ -99,7 +99,7 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
       },
       totalSize - bufferIndex,
       totalSize - 1,
-      '*',
+      totalSize,
       false,
       0
     )
