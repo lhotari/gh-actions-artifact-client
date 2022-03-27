@@ -5,7 +5,7 @@ const stream = require('stream')
 const url = require('url')
 
 const MAX_CHUNK_SIZE = config_variables.getUploadChunkSize()
-
+const MAX_UPLOAD_SIZE = 2 * 1024 * 1024 * 1024 // 2GB
 class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
   chunkSize
 
@@ -99,7 +99,7 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
       },
       totalSize - bufferIndex,
       totalSize - 1,
-      totalSize,
+      MAX_UPLOAD_SIZE,
       false,
       0
     )
