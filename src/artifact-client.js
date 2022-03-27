@@ -25,5 +25,4 @@ require('yargs')
     }
   })
   .help()
-  .alias('help', 'h')
-  .argv
+  .alias('help', 'h').argv

@@ -2,6 +2,7 @@ const UploadHttpClient = require('@actions/artifact/lib/internal/upload-http-cli
 const path_and_artifact_name_validation = require('@actions/artifact/lib/internal/path-and-artifact-name-validation.js')
 const config_variables = require('@actions/artifact/lib/internal/config-variables.js')
 const stream = require('stream')
+const url = require('url')
 
 const MAX_CHUNK_SIZE = config_variables.getUploadChunkSize()
 
@@ -20,12 +21,16 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
   async uploadStream(name, inputStream, options) {
     path_and_artifact_name_validation.checkArtifactName(name)
     const response = await this.createArtifactInFileContainer(name, options)
-    const resourceUrl = response.fileContainerResourceUrl
-    if (!resourceUrl) {
+    if (!response.fileContainerResourceUrl) {
       throw new Error(
         'No URL provided by the Artifact Service to upload an artifact to'
       )
     }
+    const fileContainerResourceUrl = new url.URL(
+      response.fileContainerResourceUrl
+    )
+    fileContainerResourceUrl.searchParams.append('itemPath', `/tmp/${name}`)
+    const resourceUrl = fileContainerResourceUrl.toString()
 
     const uploadingBuffer = Buffer.alloc(this.chunkSize)
     let totalSize = 0

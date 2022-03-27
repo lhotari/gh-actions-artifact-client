@@ -25,7 +25,7 @@ test('upload test', async () => {
     )
     .reply(200, {})
 
-  mockserver.put('/fileContainer').reply(200, {})
+  mockserver.put('/fileContainer?itemPath=%2Ftmp%2Ftest').reply(200, {})
 
   const passThrough = new stream.PassThrough()
   const buf = Buffer.alloc(2000)
