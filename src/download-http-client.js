@@ -42,16 +42,16 @@ class ExtendedDownloadHttpClient extends DownloadHttpClient.DownloadHttpClient {
         path,
         options ? options.createArtifactFolder : false
       )
-    console.log('downloadSpecification', downloadSpecification)
+    console.error('downloadSpecification', downloadSpecification)
     if (downloadSpecification.filesToDownload.length === 0) {
-      console.log(
+      console.error(
         `No downloadable files were found for the artifact: ${artifactToDownload.name}`
       )
     } else {
       await utils.createDirectoriesForArtifact(
         downloadSpecification.directoryStructure
       )
-      console.log('Directory structure has been setup for the artifact')
+      console.error('Directory structure has been setup for the artifact')
       await utils.createEmptyFilesForArtifact(
         downloadSpecification.emptyFilesToCreate
       )
