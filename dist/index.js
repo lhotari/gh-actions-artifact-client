@@ -9778,11 +9778,26 @@ module.exports = require("zlib");
           description: 'retention days',
           type: 'number',
           default: 1
+        })
+        .option('partSize', {
+          alias: 'p',
+          description: 'multi-part file size in bytes. defaults to 256MB',
+          type: 'number',
+          default: 256 * 1024 * 1024
+        })
+        .option('chunkSize', {
+          description:
+            'upload chunk size in bytes. defaults to 8MB. Maximum size is 8MB.',
+          type: 'number',
+          default: 8 * 1024 * 1024
         }),
     handler: argv => {
       const artifactName = argv.artifactName
       const ExtendedUploadHttpClient = __nccwpck_require__(6893)
-      const uploadHttpClient = new ExtendedUploadHttpClient()
+      const uploadHttpClient = new ExtendedUploadHttpClient({
+        partSize: argv.partSize,
+        chunkSize: argv.chunkSize
+      })
       uploadHttpClient.uploadStream(artifactName, process.stdin, {
         retentionDays: argv.retentionDays
       })
@@ -9848,7 +9863,6 @@ class ExtendedDownloadHttpClient extends DownloadHttpClient.DownloadHttpClient {
       .sort((a, b) => a.path.localeCompare(b.path))
     const downloadSpecification =
       download_specification.getDownloadSpecification(name, entries, '', false)
-    console.error('downloadSpecification', downloadSpecification)
     if (downloadSpecification.filesToDownload.length === 0) {
       console.error(
         `No downloadable files were found for the artifact: ${artifactToDownload.name}`
