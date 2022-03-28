@@ -6,7 +6,8 @@ require('yargs')
       yargs
         .positional('artifactName', {
           type: 'string',
-          describe: 'artifact name'
+          describe: 'artifact name',
+          demandOption: 'true'
         })
         .option('retentionDays', {
           alias: 'r',
@@ -16,12 +17,27 @@ require('yargs')
         }),
     handler: argv => {
       const artifactName = argv.artifactName
-      console.log('artifactName', artifactName)
       const ExtendedUploadHttpClient = require('./upload-http-client.js')
       const uploadHttpClient = new ExtendedUploadHttpClient()
       uploadHttpClient.uploadStream(artifactName, process.stdin, {
         retentionDays: argv.retentionDays
       })
+    }
+  })
+  .command({
+    command: 'download <artifactName>',
+    desc: 'download an artifact',
+    builder: yargs =>
+      yargs.positional('artifactName', {
+        type: 'string',
+        describe: 'artifact name',
+        demandOption: 'true'
+      }),
+    handler: argv => {
+      const artifactName = argv.artifactName
+      const ExtendedDownloadHttpClient = require('./download-http-client.js')
+      const downloadHttpClient = new ExtendedDownloadHttpClient()
+      downloadHttpClient.downloadStream(artifactName, process.stdout)
     }
   })
   .help()
