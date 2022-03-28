@@ -55,5 +55,20 @@ require('yargs')
       downloadHttpClient.downloadStream(artifactName, process.stdout)
     }
   })
+  .command({
+    command: 'delete <artifactNamePattern>',
+    desc: 'delete artifacts matching the regex pattern',
+    builder: yargs =>
+      yargs.positional('artifactNamePattern', {
+        type: 'string',
+        describe: 'artifact name (regex pattern)',
+        demandOption: 'true'
+      }),
+    handler: argv => {
+      const DeleteHttpClient = require('./delete-http-client.js')
+      const downloadHttpClient = new DeleteHttpClient()
+      downloadHttpClient.deleteArtifacts(new RegExp(argv.artifactNamePattern))
+    }
+  })
   .help()
   .alias('help', 'h').argv
