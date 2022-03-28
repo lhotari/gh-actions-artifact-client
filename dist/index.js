@@ -80,6 +80,379 @@ exports.getRetentionDays = getRetentionDays;
 
 /***/ }),
 
+/***/ 8538:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.DownloadHttpClient = void 0;
+const fs = __importStar(__nccwpck_require__(7147));
+const core = __importStar(__nccwpck_require__(2186));
+const zlib = __importStar(__nccwpck_require__(9796));
+const utils_1 = __nccwpck_require__(6327);
+const url_1 = __nccwpck_require__(7310);
+const status_reporter_1 = __nccwpck_require__(9081);
+const perf_hooks_1 = __nccwpck_require__(4074);
+const http_manager_1 = __nccwpck_require__(6527);
+const config_variables_1 = __nccwpck_require__(2222);
+const requestUtils_1 = __nccwpck_require__(755);
+class DownloadHttpClient {
+    constructor() {
+        this.downloadHttpManager = new http_manager_1.HttpManager(config_variables_1.getDownloadFileConcurrency(), '@actions/artifact-download');
+        // downloads are usually significantly faster than uploads so display status information every second
+        this.statusReporter = new status_reporter_1.StatusReporter(1000);
+    }
+    /**
+     * Gets a list of all artifacts that are in a specific container
+     */
+    listArtifacts() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const artifactUrl = utils_1.getArtifactUrl();
+            // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
+            const client = this.downloadHttpManager.getClient(0);
+            const headers = utils_1.getDownloadHeaders('application/json');
+            const response = yield requestUtils_1.retryHttpClientRequest('List Artifacts', () => __awaiter(this, void 0, void 0, function* () { return client.get(artifactUrl, headers); }));
+            const body = yield response.readBody();
+            return JSON.parse(body);
+        });
+    }
+    /**
+     * Fetches a set of container items that describe the contents of an artifact
+     * @param artifactName the name of the artifact
+     * @param containerUrl the artifact container URL for the run
+     */
+    getContainerItems(artifactName, containerUrl) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // the itemPath search parameter controls which containers will be returned
+            const resourceUrl = new url_1.URL(containerUrl);
+            resourceUrl.searchParams.append('itemPath', artifactName);
+            // use the first client from the httpManager, `keep-alive` is not used so the connection will close immediately
+            const client = this.downloadHttpManager.getClient(0);
+            const headers = utils_1.getDownloadHeaders('application/json');
+            const response = yield requestUtils_1.retryHttpClientRequest('Get Container Items', () => __awaiter(this, void 0, void 0, function* () { return client.get(resourceUrl.toString(), headers); }));
+            const body = yield response.readBody();
+            return JSON.parse(body);
+        });
+    }
+    /**
+     * Concurrently downloads all the files that are part of an artifact
+     * @param downloadItems information about what items to download and where to save them
+     */
+    downloadSingleArtifact(downloadItems) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const DOWNLOAD_CONCURRENCY = config_variables_1.getDownloadFileConcurrency();
+            // limit the number of files downloaded at a single time
+            core.debug(`Download file concurrency is set to ${DOWNLOAD_CONCURRENCY}`);
+            const parallelDownloads = [...new Array(DOWNLOAD_CONCURRENCY).keys()];
+            let currentFile = 0;
+            let downloadedFiles = 0;
+            core.info(`Total number of files that will be downloaded: ${downloadItems.length}`);
+            this.statusReporter.setTotalNumberOfFilesToProcess(downloadItems.length);
+            this.statusReporter.start();
+            yield Promise.all(parallelDownloads.map((index) => __awaiter(this, void 0, void 0, function* () {
+                while (currentFile < downloadItems.length) {
+                    const currentFileToDownload = downloadItems[currentFile];
+                    currentFile += 1;
+                    const startTime = perf_hooks_1.performance.now();
+                    yield this.downloadIndividualFile(index, currentFileToDownload.sourceLocation, currentFileToDownload.targetPath);
+                    if (core.isDebug()) {
+                        core.debug(`File: ${++downloadedFiles}/${downloadItems.length}. ${currentFileToDownload.targetPath} took ${(perf_hooks_1.performance.now() - startTime).toFixed(3)} milliseconds to finish downloading`);
+                    }
+                    this.statusReporter.incrementProcessedCount();
+                }
+            })))
+                .catch(error => {
+                throw new Error(`Unable to download the artifact: ${error}`);
+            })
+                .finally(() => {
+                this.statusReporter.stop();
+                // safety dispose all connections
+                this.downloadHttpManager.disposeAndReplaceAllClients();
+            });
+        });
+    }
+    /**
+     * Downloads an individual file
+     * @param httpClientIndex the index of the http client that is used to make all of the calls
+     * @param artifactLocation origin location where a file will be downloaded from
+     * @param downloadPath destination location for the file being downloaded
+     */
+    downloadIndividualFile(httpClientIndex, artifactLocation, downloadPath) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retryCount = 0;
+            const retryLimit = config_variables_1.getRetryLimit();
+            let destinationStream = fs.createWriteStream(downloadPath);
+            const headers = utils_1.getDownloadHeaders('application/json', true, true);
+            // a single GET request is used to download a file
+            const makeDownloadRequest = () => __awaiter(this, void 0, void 0, function* () {
+                const client = this.downloadHttpManager.getClient(httpClientIndex);
+                return yield client.get(artifactLocation, headers);
+            });
+            // check the response headers to determine if the file was compressed using gzip
+            const isGzip = (incomingHeaders) => {
+                return ('content-encoding' in incomingHeaders &&
+                    incomingHeaders['content-encoding'] === 'gzip');
+            };
+            // Increments the current retry count and then checks if the retry limit has been reached
+            // If there have been too many retries, fail so the download stops. If there is a retryAfterValue value provided,
+            // it will be used
+            const backOff = (retryAfterValue) => __awaiter(this, void 0, void 0, function* () {
+                retryCount++;
+                if (retryCount > retryLimit) {
+                    return Promise.reject(new Error(`Retry limit has been reached. Unable to download ${artifactLocation}`));
+                }
+                else {
+                    this.downloadHttpManager.disposeAndReplaceClient(httpClientIndex);
+                    if (retryAfterValue) {
+                        // Back off by waiting the specified time denoted by the retry-after header
+                        core.info(`Backoff due to too many requests, retry #${retryCount}. Waiting for ${retryAfterValue} milliseconds before continuing the download`);
+                        yield utils_1.sleep(retryAfterValue);
+                    }
+                    else {
+                        // Back off using an exponential value that depends on the retry count
+                        const backoffTime = utils_1.getExponentialRetryTimeInMilliseconds(retryCount);
+                        core.info(`Exponential backoff for retry #${retryCount}. Waiting for ${backoffTime} milliseconds before continuing the download`);
+                        yield utils_1.sleep(backoffTime);
+                    }
+                    core.info(`Finished backoff for retry #${retryCount}, continuing with download`);
+                }
+            });
+            const isAllBytesReceived = (expected, received) => {
+                // be lenient, if any input is missing, assume success, i.e. not truncated
+                if (!expected ||
+                    !received ||
+                    process.env['ACTIONS_ARTIFACT_SKIP_DOWNLOAD_VALIDATION']) {
+                    core.info('Skipping download validation.');
+                    return true;
+                }
+                return parseInt(expected) === received;
+            };
+            const resetDestinationStream = (fileDownloadPath) => __awaiter(this, void 0, void 0, function* () {
+                destinationStream.close();
+                yield utils_1.rmFile(fileDownloadPath);
+                destinationStream = fs.createWriteStream(fileDownloadPath);
+            });
+            // keep trying to download a file until a retry limit has been reached
+            while (retryCount <= retryLimit) {
+                let response;
+                try {
+                    response = yield makeDownloadRequest();
+                }
+                catch (error) {
+                    // if an error is caught, it is usually indicative of a timeout so retry the download
+                    core.info('An error occurred while attempting to download a file');
+                    // eslint-disable-next-line no-console
+                    console.log(error);
+                    // increment the retryCount and use exponential backoff to wait before making the next request
+                    yield backOff();
+                    continue;
+                }
+                let forceRetry = false;
+                if (utils_1.isSuccessStatusCode(response.message.statusCode)) {
+                    // The body contains the contents of the file however calling response.readBody() causes all the content to be converted to a string
+                    // which can cause some gzip encoded data to be lost
+                    // Instead of using response.readBody(), response.message is a readableStream that can be directly used to get the raw body contents
+                    try {
+                        const isGzipped = isGzip(response.message.headers);
+                        yield this.pipeResponseToFile(response, destinationStream, isGzipped);
+                        if (isGzipped ||
+                            isAllBytesReceived(response.message.headers['content-length'], yield utils_1.getFileSize(downloadPath))) {
+                            return;
+                        }
+                        else {
+                            forceRetry = true;
+                        }
+                    }
+                    catch (error) {
+                        // retry on error, most likely streams were corrupted
+                        forceRetry = true;
+                    }
+                }
+                if (forceRetry || utils_1.isRetryableStatusCode(response.message.statusCode)) {
+                    core.info(`A ${response.message.statusCode} response code has been received while attempting to download an artifact`);
+                    resetDestinationStream(downloadPath);
+                    // if a throttled status code is received, try to get the retryAfter header value, else differ to standard exponential backoff
+                    utils_1.isThrottledStatusCode(response.message.statusCode)
+                        ? yield backOff(utils_1.tryGetRetryAfterValueTimeInMilliseconds(response.message.headers))
+                        : yield backOff();
+                }
+                else {
+                    // Some unexpected response code, fail immediately and stop the download
+                    utils_1.displayHttpDiagnostics(response);
+                    return Promise.reject(new Error(`Unexpected http ${response.message.statusCode} during download for ${artifactLocation}`));
+                }
+            }
+        });
+    }
+    /**
+     * Pipes the response from downloading an individual file to the appropriate destination stream while decoding gzip content if necessary
+     * @param response the http response received when downloading a file
+     * @param destinationStream the stream where the file should be written to
+     * @param isGzip a boolean denoting if the content is compressed using gzip and if we need to decode it
+     */
+    pipeResponseToFile(response, destinationStream, isGzip) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield new Promise((resolve, reject) => {
+                if (isGzip) {
+                    const gunzip = zlib.createGunzip();
+                    response.message
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to read the response stream`);
+                        gunzip.close();
+                        destinationStream.close();
+                        reject(error);
+                    })
+                        .pipe(gunzip)
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to decompress the response stream`);
+                        destinationStream.close();
+                        reject(error);
+                    })
+                        .pipe(destinationStream)
+                        .on('close', () => {
+                        resolve();
+                    })
+                        .on('error', error => {
+                        core.error(`An error occurred while writing a downloaded file to ${destinationStream.path}`);
+                        reject(error);
+                    });
+                }
+                else {
+                    response.message
+                        .on('error', error => {
+                        core.error(`An error occurred while attempting to read the response stream`);
+                        destinationStream.close();
+                        reject(error);
+                    })
+                        .pipe(destinationStream)
+                        .on('close', () => {
+                        resolve();
+                    })
+                        .on('error', error => {
+                        core.error(`An error occurred while writing a downloaded file to ${destinationStream.path}`);
+                        reject(error);
+                    });
+                }
+            });
+            return;
+        });
+    }
+}
+exports.DownloadHttpClient = DownloadHttpClient;
+//# sourceMappingURL=download-http-client.js.map
+
+/***/ }),
+
+/***/ 5686:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getDownloadSpecification = void 0;
+const path = __importStar(__nccwpck_require__(1017));
+/**
+ * Creates a specification for a set of files that will be downloaded
+ * @param artifactName the name of the artifact
+ * @param artifactEntries a set of container entries that describe that files that make up an artifact
+ * @param downloadPath the path where the artifact will be downloaded to
+ * @param includeRootDirectory specifies if there should be an extra directory (denoted by the artifact name) where the artifact files should be downloaded to
+ */
+function getDownloadSpecification(artifactName, artifactEntries, downloadPath, includeRootDirectory) {
+    // use a set for the directory paths so that there are no duplicates
+    const directories = new Set();
+    const specifications = {
+        rootDownloadLocation: includeRootDirectory
+            ? path.join(downloadPath, artifactName)
+            : downloadPath,
+        directoryStructure: [],
+        emptyFilesToCreate: [],
+        filesToDownload: []
+    };
+    for (const entry of artifactEntries) {
+        // Ignore artifacts in the container that don't begin with the same name
+        if (entry.path.startsWith(`${artifactName}/`) ||
+            entry.path.startsWith(`${artifactName}\\`)) {
+            // normalize all separators to the local OS
+            const normalizedPathEntry = path.normalize(entry.path);
+            // entry.path always starts with the artifact name, if includeRootDirectory is false, remove the name from the beginning of the path
+            const filePath = path.join(downloadPath, includeRootDirectory
+                ? normalizedPathEntry
+                : normalizedPathEntry.replace(artifactName, ''));
+            // Case insensitive folder structure maintained in the backend, not every folder is created so the 'folder'
+            // itemType cannot be relied upon. The file must be used to determine the directory structure
+            if (entry.itemType === 'file') {
+                // Get the directories that we need to create from the filePath for each individual file
+                directories.add(path.dirname(filePath));
+                if (entry.fileLength === 0) {
+                    // An empty file was uploaded, create the empty files locally so that no extra http calls are made
+                    specifications.emptyFilesToCreate.push(filePath);
+                }
+                else {
+                    specifications.filesToDownload.push({
+                        sourceLocation: entry.contentLocation,
+                        targetPath: filePath
+                    });
+                }
+            }
+        }
+    }
+    specifications.directoryStructure = Array.from(directories);
+    return specifications;
+}
+exports.getDownloadSpecification = getDownloadSpecification;
+//# sourceMappingURL=download-specification.js.map
+
+/***/ }),
+
 /***/ 6527:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -1574,7 +1947,14 @@ function getIDToken(aud) {
     });
 }
 exports.getIDToken = getIDToken;
-//# sourceMappingURL=core.js.map
+//# sourceMappingURL=core.js.map//#patched
+exports.debug=() => {};
+exports.setOutput=() => {};
+exports.notice=() => {};
+exports.info=(message) => process.stderr.write(message + os.EOL);
+exports.error=(message) => process.stderr.write(message + os.EOL);
+exports.warning=(message) => process.stderr.write(message + os.EOL);
+
 
 /***/ }),
 
@@ -9390,7 +9770,8 @@ module.exports = require("zlib");
       yargs
         .positional('artifactName', {
           type: 'string',
-          describe: 'artifact name'
+          describe: 'artifact name',
+          demandOption: 'true'
         })
         .option('retentionDays', {
           alias: 'r',
@@ -9400,7 +9781,6 @@ module.exports = require("zlib");
         }),
     handler: argv => {
       const artifactName = argv.artifactName
-      console.log('artifactName', artifactName)
       const ExtendedUploadHttpClient = __nccwpck_require__(6893)
       const uploadHttpClient = new ExtendedUploadHttpClient()
       uploadHttpClient.uploadStream(artifactName, process.stdin, {
@@ -9408,9 +9788,98 @@ module.exports = require("zlib");
       })
     }
   })
+  .command({
+    command: 'download <artifactName>',
+    desc: 'download an artifact',
+    builder: yargs =>
+      yargs.positional('artifactName', {
+        type: 'string',
+        describe: 'artifact name',
+        demandOption: 'true'
+      }),
+    handler: argv => {
+      const artifactName = argv.artifactName
+      const ExtendedDownloadHttpClient = __nccwpck_require__(5900)
+      const downloadHttpClient = new ExtendedDownloadHttpClient()
+      downloadHttpClient.downloadStream(artifactName, process.stdout)
+    }
+  })
   .help()
-  .alias('help', 'h')
-  .argv
+  .alias('help', 'h').argv
+
+
+/***/ }),
+
+/***/ 5900:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const DownloadHttpClient = __nccwpck_require__(8538)
+const config_variables = __nccwpck_require__(2222)
+const utils = __nccwpck_require__(6327)
+const download_specification = __nccwpck_require__(5686)
+const pathlib = __nccwpck_require__(1017)
+
+class ExtendedDownloadHttpClient extends DownloadHttpClient.DownloadHttpClient {
+  constructor() {
+    super()
+  }
+
+  async downloadStream(name, outputStream) {
+    await this.downloadArtifact(name, '/tmp')
+  }
+
+  async downloadArtifact(name, path, options) {
+    const artifacts = await this.listArtifacts()
+    if (artifacts.count === 0) {
+      throw new Error(
+        `Unable to find any artifacts for the associated workflow`
+      )
+    }
+    const artifactToDownload = artifacts.value.find(artifact => {
+      return artifact.name === name
+    })
+    if (!artifactToDownload) {
+      throw new Error(`Unable to find an artifact with the name: ${name}`)
+    }
+    const items = await this.getContainerItems(
+      artifactToDownload.name,
+      artifactToDownload.fileContainerResourceUrl
+    )
+    if (!path) {
+      path = config_variables.getWorkSpaceDirectory()
+    }
+    path = pathlib.normalize(path)
+    path = pathlib.resolve(path)
+    const downloadSpecification =
+      download_specification.getDownloadSpecification(
+        name,
+        items.value,
+        path,
+        options ? options.createArtifactFolder : false
+      )
+    console.log('downloadSpecification', downloadSpecification)
+    if (downloadSpecification.filesToDownload.length === 0) {
+      console.log(
+        `No downloadable files were found for the artifact: ${artifactToDownload.name}`
+      )
+    } else {
+      await utils.createDirectoriesForArtifact(
+        downloadSpecification.directoryStructure
+      )
+      console.log('Directory structure has been setup for the artifact')
+      await utils.createEmptyFilesForArtifact(
+        downloadSpecification.emptyFilesToCreate
+      )
+      await this.downloadSingleArtifact(downloadSpecification.filesToDownload)
+    }
+    return {
+      artifactName: name,
+      downloadPath: downloadSpecification.rootDownloadLocation
+    }
+  }
+}
+
+module.exports = ExtendedDownloadHttpClient
 
 
 /***/ }),
@@ -9422,89 +9891,179 @@ const UploadHttpClient = __nccwpck_require__(4354)
 const path_and_artifact_name_validation = __nccwpck_require__(7398)
 const config_variables = __nccwpck_require__(2222)
 const stream = __nccwpck_require__(2781)
+const url = __nccwpck_require__(7310)
 
 const MAX_CHUNK_SIZE = config_variables.getUploadChunkSize()
+const DEFAULT_PART_SIZE = 256 * 1024 * 1024 // 256MB
 
 class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
-  chunkSize
+  chunkSize = MAX_CHUNK_SIZE
+  partSize = Math.max(DEFAULT_PART_SIZE, this.chunkSize)
 
-  constructor(chunkSize) {
+  constructor(options) {
     super()
-    if (chunkSize && chunkSize > 0) {
-      this.chunkSize = Math.min(MAX_CHUNK_SIZE, chunkSize)
-    } else {
-      this.chunkSize = MAX_CHUNK_SIZE
+    if (options) {
+      if (options.chunkSize && options.chunkSize > 0) {
+        this.chunkSize = Math.min(MAX_CHUNK_SIZE, options.chunkSize)
+      } else {
+        this.chunkSize = MAX_CHUNK_SIZE
+      }
+      if (options.partSize && options.partSize > 0) {
+        this.partSize = Math.max(options.partSize, this.chunkSize)
+      } else {
+        this.partSize = DEFAULT_PART_SIZE
+      }
     }
   }
 
+  /**
+   * Uploads a stream to GitHub Artifacts as multiple files that are named "part000, part001, part002..."
+   */
   async uploadStream(name, inputStream, options) {
     path_and_artifact_name_validation.checkArtifactName(name)
     const response = await this.createArtifactInFileContainer(name, options)
-    const resourceUrl = response.fileContainerResourceUrl
-    if (!resourceUrl) {
+    if (!response.fileContainerResourceUrl) {
       throw new Error(
         'No URL provided by the Artifact Service to upload an artifact to'
       )
     }
 
-    const uploadingBuffer = Buffer.alloc(this.chunkSize)
-    let totalSize = 0
-    let bufferIndex = 0
+    const streamUploader = new StreamUploader(
+      name,
+      response.fileContainerResourceUrl,
+      this.partSize,
+      this.chunkSize,
+      async (
+        httpClientIndex,
+        resourceUrl,
+        openStream,
+        start,
+        end,
+        uploadFileSize,
+        isGzip,
+        totalFileSize
+      ) => {
+        return await this.uploadChunk(
+          httpClientIndex,
+          resourceUrl,
+          openStream,
+          start,
+          end,
+          uploadFileSize,
+          isGzip,
+          totalFileSize
+        )
+      }
+    )
 
     await new Promise(resolve => {
       inputStream.on('data', async data => {
-        let remainingBytes = data.length
-        let dataIndex = 0
-        while (remainingBytes > 0) {
-          const readBytes = Math.min(
-            remainingBytes,
-            uploadingBuffer.length - bufferIndex
-          )
-          data.copy(
-            uploadingBuffer,
-            bufferIndex,
-            dataIndex,
-            dataIndex + readBytes
-          )
-          bufferIndex += readBytes
-          dataIndex += readBytes
-          remainingBytes -= readBytes
-          if (bufferIndex == uploadingBuffer.length) {
-            totalSize += bufferIndex
-            const prevBufferIndex = bufferIndex
-            bufferIndex = 0
-            inputStream.pause()
-            await this.uploadBuffer(
-              resourceUrl,
-              uploadingBuffer,
-              prevBufferIndex,
-              totalSize
-            )
-            inputStream.resume()
-          }
-        }
+        await streamUploader.onData(data, async flushFunctionToExecuteWhilePaused => {
+          inputStream.pause()
+          await flushFunctionToExecuteWhilePaused()
+          inputStream.resume()
+        })
       })
-
       inputStream.on('end', async () => {
-        if (bufferIndex > 0) {
-          totalSize += bufferIndex
-          await this.uploadBuffer(
-            resourceUrl,
-            uploadingBuffer,
-            bufferIndex,
-            totalSize
-          )
-        }
+        await streamUploader.flush()
         resolve()
       })
     })
 
-    await this.patchArtifactSize(totalSize, name)
+    await this.patchArtifactSize(streamUploader.totalSize, name)
+  }
+}
+
+class StreamUploader {
+  artifactName
+  fileContainerResourceUrl
+  partBuffer
+  partBufferIndex = 0
+  partNumber = 0
+  chunkSize
+  totalSize = 0
+  uploadChunkFunction
+
+  constructor(
+    artifactName,
+    fileContainerResourceUrl,
+    partSize,
+    chunkSize,
+    uploadChunkFunction
+  ) {
+    this.artifactName = artifactName
+    this.fileContainerResourceUrl = new url.URL(fileContainerResourceUrl)
+    this.partBuffer = Buffer.alloc(partSize)
+    this.chunkSize = chunkSize
+    this.uploadChunkFunction = uploadChunkFunction
+    this.updateResourceUrl()
   }
 
-  async uploadBuffer(resourceUrl, readBuffer, bufferIndex, totalSize) {
-    const bufSlice = readBuffer.slice(0, bufferIndex)
-    const result = await this.uploadChunk(
+  updateResourceUrl() {
+    this.fileContainerResourceUrl.searchParams.set(
+      'itemPath',
+      `${this.artifactName}/part${this.partNumber.toString().padStart(3, 0)}`
+    )
+    this.resourceUrl = this.fileContainerResourceUrl.toString()
+  }
+
+  async onData(data, pauseWhileExecuting) {
+    let remainingBytes = data.length
+    let dataIndex = 0
+    while (remainingBytes > 0) {
+      const readBytes = Math.min(
+        remainingBytes,
+        this.partBuffer.length - this.partBufferIndex
+      )
+      data.copy(
+        this.partBuffer,
+        this.partBufferIndex,
+        dataIndex,
+        dataIndex + readBytes
+      )
+      this.partBufferIndex += readBytes
+      dataIndex += readBytes
+      remainingBytes -= readBytes
+      if (this.partBufferIndex == this.partBuffer.length) {
+        await pauseWhileExecuting(async () => {
+          await this.flush()
+        })
+      }
+    }
+  }
+
+  async flush() {
+    if (this.partBufferIndex > 0) {
+      this.totalSize += this.partBufferIndex
+      const currentBufferIndex = this.partBufferIndex
+      this.partBufferIndex = 0
+      const currentResourceUrl = this.resourceUrl
+      this.partNumber++
+      this.updateResourceUrl()
+      await this.uploadPartBuffer(currentResourceUrl, currentBufferIndex)
+    }
+  }
+
+  async uploadPartBuffer(resourceUrl, partBufferIndex) {
+    let remainingBytes = partBufferIndex
+    let readIndex = 0
+    while (remainingBytes > 0) {
+      const readBytes = Math.min(remainingBytes, this.chunkSize)
+      await this.uploadBuffer(
+        resourceUrl,
+        readIndex,
+        readBytes,
+        partBufferIndex
+      )
+      readIndex += readBytes
+      remainingBytes -= readBytes
+    }
+  }
+
+  async uploadBuffer(resourceUrl, startIndex, chunkLength, totalSize) {
+    const bufSlice = this.partBuffer.slice(startIndex, startIndex + chunkLength)
+    const endIndex = startIndex + chunkLength - 1
+    const result = await this.uploadChunkFunction(
       0,
       resourceUrl,
       () => {
@@ -9512,14 +10071,16 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
         passThrough.end(bufSlice)
         return passThrough
       },
-      totalSize - bufferIndex,
-      totalSize - 1,
-      '*',
+      startIndex,
+      endIndex,
+      totalSize,
       false,
       0
     )
     if (!result) {
-      throw new Error('File upload failed at total size of ' + totalSize)
+      throw new Error(
+        `File upload failed for ${resourceUrl} range ${startIndex}-${endIndex}/${totalSize}`
+      )
     }
     return result
   }
