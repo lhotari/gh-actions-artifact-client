@@ -33,7 +33,6 @@ class ExtendedDownloadHttpClient extends DownloadHttpClient.DownloadHttpClient {
       .sort((a, b) => a.path.localeCompare(b.path))
     const downloadSpecification =
       download_specification.getDownloadSpecification(name, entries, '', false)
-    console.error('downloadSpecification', downloadSpecification)
     if (downloadSpecification.filesToDownload.length === 0) {
       console.error(
         `No downloadable files were found for the artifact: ${artifactToDownload.name}`
