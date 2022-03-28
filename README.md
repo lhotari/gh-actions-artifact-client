@@ -8,20 +8,25 @@ The upload is streamed from stdin and the download is streamed to stdout.
 
 This makes it possible to use `docker save` and `docker load` to work efficiently with GitHub Actions Artifacts.
 
-The required environment variables get set for node js actions ([here](https://github.com/actions/runner/blob/408d6c579c36f0eb318acfdafdcbafc872696501/src/Runner.Worker/Handlers/NodeScriptActionHandler.cs#L51-L52)) and container actions ([here](https://github.com/actions/runner/blob/408d6c579c36f0eb318acfdafdcbafc872696501/src/Runner.Worker/Handlers/ContainerActionHandler.cs#L206-L207)). The environment variables must be stored to the files with a separate action.
-
 ### Usage
 
-uploading - stores stdin input as multiple files under the given artifact name
-```
-some_command | node dist/index.js upload artifact_name
+It is necessary to set up the required tokens and script once in a build job:
+```yaml
+- uses: lhotari/gh-actions-artifact-client/dist@master
 ```
 
-downloading - retries the given artifact and outputs to stdout.
+After this, `gh-actions-artifact-client.js` will be available in run scripts.
+
+*uploading* - stores stdin input as multiple files under the given artifact name
+```bash
+some_command | gh-actions-artifact-client.js upload artifact_name
+```
+
+*downloading* - retries the given artifact and outputs to stdout.
 This is meant to be used only for artifacts that were uploaded in the same format.
 
-```
-node dist/index.js download artifact_name | some_command
+```bash
+gh-actions-artifact-client.js download artifact_name | some_command
 ```
 
 Uploading and downloading requires about 600MB RAM with the default settings.
