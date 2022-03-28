@@ -69,11 +69,14 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
 
     await new Promise(resolve => {
       inputStream.on('data', async data => {
-        await streamUploader.onData(data, async flushFunctionToExecuteWhilePaused => {
-          inputStream.pause()
-          await flushFunctionToExecuteWhilePaused()
-          inputStream.resume()
-        })
+        await streamUploader.onData(
+          data,
+          async flushFunctionToExecuteWhilePaused => {
+            inputStream.pause()
+            await flushFunctionToExecuteWhilePaused()
+            inputStream.resume()
+          }
+        )
       })
       inputStream.on('end', async () => {
         await streamUploader.flush()
