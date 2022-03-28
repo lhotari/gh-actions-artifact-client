@@ -17,10 +17,16 @@ uploading - stores stdin input as multiple files under the given artifact name
 some_command | node dist/index.js upload artifact_name
 ```
 
-downloading - retries the given artifact and outputs to stdout
+downloading - retries the given artifact and outputs to stdout.
+This is meant to be used only for artifacts that were uploaded in the same format.
+
 ```
 node dist/index.js download artifact_name | some_command
 ```
+
+Uploading and downloading requires about 600MB RAM with the default settings.
+In uploading, the stream is split into multiple file parts where each part is of the size of 256MB.
+The reason for this is the limitation of GitHub Actions Artifacts where the uploaded files must have a predefined size. The streaming will buffer into memory so that parts are fully contained before they are uploaded.
 
 ### Development testing
 
