@@ -27,13 +27,28 @@ test('download test', async () => {
     value: [
       {
         itemType: 'file',
-        path: 'test/content',
-        contentLocation: 'http://localhost:12345/fileContent'
+        path: 'test/part000',
+        contentLocation: 'http://localhost:12345/fileContent0'
+      },
+      {
+        itemType: 'file',
+        path: 'test/part001',
+        contentLocation: 'http://localhost:12345/fileContent1'
       }
     ]
   })
-  mockserver.get('/fileContent').reply(200, 'Hello world!')
+  mockserver.get('/fileContent0').reply(200, 'Hello', {
+    'Content-Length': (req, res, body) => body.length
+  })
+  mockserver.get('/fileContent1').reply(200, ' world!', {
+    'Content-Length': (req, res, body) => body.length
+  })
   const artifactName = 'test'
   const downloadHttpClient = new ExtendedDownloadHttpClient(2000)
-  await downloadHttpClient.downloadStream(artifactName, '/tmp')
+  var testOutput = new stream.Writable()
+  testOutput._write = function (chunk, encoding, done) {
+    console.error(`output: '${chunk.toString()}'`)
+    done()
+  }
+  await downloadHttpClient.downloadStream(artifactName, testOutput)
 })
