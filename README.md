@@ -22,4 +22,27 @@ downloading - retries the given artifact and outputs to stdout
 node dist/index.js download artifact_name | some_command
 ```
 
+### Development testing
 
+There are a few unit tests with limited assertions
+```
+npm test
+```
+Unit tests use [nock](https://github.com/nock/nock) HTTP server mocking.
+
+### Manual development testing
+
+Commands that were used to do manual verification on GitHub Actions runner VM.
+[action-upterm](https://github.com/lhotari/action-upterm) was used to open a ssh session to the runner VM for testing.
+
+```bash
+git clone https://github.com/lhotari/gh-actions-artifact-client
+cd gh-actions-artifact-client/
+sudo chown $USER /mnt
+dd if=/dev/random of=/mnt/testfile2 bs=1M count=600
+sudo apt install pv
+pv /mnt/testfile2 |node dist/index.js upload testfile2
+node dist/index.js download testfile2 |pv > /mnt/testfile2_downloaded
+md5sum /mnt/testfile2
+md5sum /mnt/testfile2_downloaded
+```
