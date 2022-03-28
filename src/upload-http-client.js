@@ -29,7 +29,7 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
     const fileContainerResourceUrl = new url.URL(
       response.fileContainerResourceUrl
     )
-    fileContainerResourceUrl.searchParams.append('itemPath', `/tmp/${name}`)
+    fileContainerResourceUrl.searchParams.append('itemPath', `${name}/content`)
     const resourceUrl = fileContainerResourceUrl.toString()
 
     const uploadingBuffer = Buffer.alloc(this.chunkSize)
