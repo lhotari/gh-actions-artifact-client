@@ -5,19 +5,31 @@ const stream = require('stream')
 const url = require('url')
 
 const MAX_CHUNK_SIZE = config_variables.getUploadChunkSize()
-const MAX_UPLOAD_SIZE = 2 * 1024 * 1024 * 1024 // 2GB
-class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
-  chunkSize
+const DEFAULT_PART_SIZE = 256 * 1024 * 1024 // 256MB
 
-  constructor(chunkSize) {
+class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
+  chunkSize = MAX_CHUNK_SIZE
+  partSize = Math.max(DEFAULT_PART_SIZE, this.chunkSize)
+
+  constructor(options) {
     super()
-    if (chunkSize && chunkSize > 0) {
-      this.chunkSize = Math.min(MAX_CHUNK_SIZE, chunkSize)
-    } else {
-      this.chunkSize = MAX_CHUNK_SIZE
+    if (options) {
+      if (options.chunkSize && options.chunkSize > 0) {
+        this.chunkSize = Math.min(MAX_CHUNK_SIZE, options.chunkSize)
+      } else {
+        this.chunkSize = MAX_CHUNK_SIZE
+      }
+      if (options.partSize && options.partSize > 0) {
+        this.partSize = Math.max(options.partSize, this.chunkSize)
+      } else {
+        this.partSize = DEFAULT_PART_SIZE
+      }
     }
   }
 
+  /**
+   * Uploads a stream to GitHub Artifacts as multiple files that are named "part000, part001, part002..."
+   */
   async uploadStream(name, inputStream, options) {
     path_and_artifact_name_validation.checkArtifactName(name)
     const response = await this.createArtifactInFileContainer(name, options)
@@ -26,70 +38,143 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
         'No URL provided by the Artifact Service to upload an artifact to'
       )
     }
-    const fileContainerResourceUrl = new url.URL(
-      response.fileContainerResourceUrl
-    )
-    fileContainerResourceUrl.searchParams.append('itemPath', `${name}/content`)
-    const resourceUrl = fileContainerResourceUrl.toString()
 
-    const uploadingBuffer = Buffer.alloc(this.chunkSize)
-    let totalSize = 0
-    let bufferIndex = 0
+    const streamUploader = new StreamUploader(
+      name,
+      response.fileContainerResourceUrl,
+      this.partSize,
+      this.chunkSize,
+      async (
+        httpClientIndex,
+        resourceUrl,
+        openStream,
+        start,
+        end,
+        uploadFileSize,
+        isGzip,
+        totalFileSize
+      ) => {
+        return await this.uploadChunk(
+          httpClientIndex,
+          resourceUrl,
+          openStream,
+          start,
+          end,
+          uploadFileSize,
+          isGzip,
+          totalFileSize
+        )
+      }
+    )
 
     await new Promise(resolve => {
       inputStream.on('data', async data => {
-        let remainingBytes = data.length
-        let dataIndex = 0
-        while (remainingBytes > 0) {
-          const readBytes = Math.min(
-            remainingBytes,
-            uploadingBuffer.length - bufferIndex
-          )
-          data.copy(
-            uploadingBuffer,
-            bufferIndex,
-            dataIndex,
-            dataIndex + readBytes
-          )
-          bufferIndex += readBytes
-          dataIndex += readBytes
-          remainingBytes -= readBytes
-          if (bufferIndex == uploadingBuffer.length) {
-            totalSize += bufferIndex
-            const prevBufferIndex = bufferIndex
-            bufferIndex = 0
-            inputStream.pause()
-            await this.uploadBuffer(
-              resourceUrl,
-              uploadingBuffer,
-              prevBufferIndex,
-              totalSize
-            )
-            inputStream.resume()
-          }
-        }
+        streamUploader.onData(data, async flushFunctionToExecuteWhilePaused => {
+          inputStream.pause()
+          await flushFunctionToExecuteWhilePaused()
+          inputStream.resume()
+        })
       })
-
       inputStream.on('end', async () => {
-        if (bufferIndex > 0) {
-          totalSize += bufferIndex
-          await this.uploadBuffer(
-            resourceUrl,
-            uploadingBuffer,
-            bufferIndex,
-            totalSize
-          )
-        }
+        await streamUploader.flush()
         resolve()
       })
     })
 
-    await this.patchArtifactSize(totalSize, name)
+    await this.patchArtifactSize(streamUploader.totalSize, name)
+  }
+}
+
+class StreamUploader {
+  artifactName
+  fileContainerResourceUrl
+  partBuffer
+  partBufferIndex = 0
+  partNumber = 0
+  chunkSize
+  totalSize = 0
+  uploadChunkFunction
+
+  constructor(
+    artifactName,
+    fileContainerResourceUrl,
+    partSize,
+    chunkSize,
+    uploadChunkFunction
+  ) {
+    this.artifactName = artifactName
+    this.fileContainerResourceUrl = new url.URL(fileContainerResourceUrl)
+    this.partBuffer = Buffer.alloc(partSize)
+    this.chunkSize = chunkSize
+    this.uploadChunkFunction = uploadChunkFunction
+    this.updateResourceUrl()
   }
 
-  async uploadBuffer(resourceUrl, readBuffer, bufferIndex, totalSize) {
-    const bufSlice = readBuffer.slice(0, bufferIndex)
-    const result = await this.uploadChunk(
+  updateResourceUrl() {
+    this.fileContainerResourceUrl.searchParams.set(
+      'itemPath',
+      `${this.artifactName}/part${this.partNumber.toString().padStart(3, 0)}`
+    )
+    this.resourceUrl = this.fileContainerResourceUrl.toString()
+  }
+
+  async onData(data, pauseWhileExecuting) {
+    let remainingBytes = data.length
+    let dataIndex = 0
+    while (remainingBytes > 0) {
+      const readBytes = Math.min(
+        remainingBytes,
+        this.partBuffer.length - this.partBufferIndex
+      )
+      data.copy(
+        this.partBuffer,
+        this.partBufferIndex,
+        dataIndex,
+        dataIndex + readBytes
+      )
+      this.partBufferIndex += readBytes
+      dataIndex += readBytes
+      remainingBytes -= readBytes
+      if (this.partBufferIndex == this.partBuffer.length) {
+        await pauseWhileExecuting(async () => {
+          await this.flush()
+        })
+      }
+    }
+  }
+
+  async flush() {
+    if (this.partBufferIndex > 0) {
+      this.totalSize += this.partBufferIndex
+      const currentBufferIndex = this.partBufferIndex
+      this.partBufferIndex = 0
+      const currentResourceUrl = this.resourceUrl
+      this.partNumber++
+      this.updateResourceUrl()
+      await this.uploadPartBuffer(currentResourceUrl, currentBufferIndex)
+    }
+  }
+
+  async uploadPartBuffer(resourceUrl, partBufferIndex) {
+    let remainingBytes = partBufferIndex
+    let readIndex = 0
+    while (remainingBytes > 0) {
+      const readBytes = Math.min(remainingBytes, this.chunkSize)
+      await this.uploadBuffer(
+        resourceUrl,
+        readIndex,
+        readBytes,
+        partBufferIndex
+      )
+      readIndex += readBytes
+      remainingBytes -= readBytes
+    }
+  }
+
+  async uploadBuffer(resourceUrl, startIndex, chunkLength, totalSize) {
+    const bufSlice = this.partBuffer.slice(startIndex, startIndex + chunkLength)
+    const endIndex = startIndex + chunkLength - 1
+    const result = await this.uploadChunkFunction(
       0,
       resourceUrl,
       () => {
@@ -97,14 +182,16 @@ class ExtendedUploadHttpClient extends UploadHttpClient.UploadHttpClient {
         passThrough.end(bufSlice)
         return passThrough
       },
-      totalSize - bufferIndex,
-      totalSize - 1,
-      MAX_UPLOAD_SIZE,
+      startIndex,
+      endIndex,
+      totalSize,
       false,
       0
     )
     if (!result) {
-      throw new Error('File upload failed at total size of ' + totalSize)
+      throw new Error(
+        `File upload failed for ${resourceUrl} range ${startIndex}-${endIndex}/${totalSize}`
+      )
     }
     return result
   }

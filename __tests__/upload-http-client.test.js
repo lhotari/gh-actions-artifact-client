@@ -25,7 +25,7 @@ test('upload test', async () => {
     )
     .reply(200, {})
 
-  mockserver.put('/fileContainer?itemPath=test%2Fcontent').reply(200, {})
+  mockserver.put('/fileContainer').query(true).reply(200, {})
 
   const passThrough = new stream.PassThrough()
   const buf = Buffer.alloc(2000)
@@ -33,7 +33,10 @@ test('upload test', async () => {
 
   const ExtendedUploadHttpClient = require('../src/upload-http-client.js')
   const artifactName = 'test'
-  const uploadHttpClient = new ExtendedUploadHttpClient(2000)
+  const uploadHttpClient = new ExtendedUploadHttpClient({
+    chunkSize: 97,
+    partSize: 500
+  })
   await uploadHttpClient.uploadStream(artifactName, passThrough, {
     retentionDays: 1
   })
