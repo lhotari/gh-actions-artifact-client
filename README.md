@@ -9,7 +9,7 @@ This makes it possible to use `docker save` and `docker load` to work efficientl
 
 ### Limitation: Download command supports only downloading artifacts uploaded with the same client
 
-:warning: The download command currently supports only downloading artifacts uploaded with the same client. 
+:warning: The download command currently supports only downloading artifacts uploaded with the same client.
 In uploading, the stream is split into multiple file parts where each part is of the size of 256MB.
 
 The reason for this is the limitation of GitHub Actions Artifacts where the uploaded files must have a predefined size. The streaming will buffer into memory so that parts are fully contained before they are uploaded. Uploading and downloading requires about 600MB RAM with the default settings.
@@ -20,7 +20,7 @@ The download command downloads part001, part002, part003, ... files and outputs 
 
 It is necessary to set up the required tokens and script once in a build job:
 ```yaml
-- uses: lhotari/gh-actions-artifact-client/dist@master
+- uses: lhotari/gh-actions-artifact-client@master
 ```
 
 After this, `gh-actions-artifact-client.js` will be available in run scripts.
@@ -40,7 +40,7 @@ gh-actions-artifact-client.js download artifact_name | some_command
 ### Usage tips
 
 You can download artifacts from the GitHub Actions UI after the workflow has finished.
-GitHub Actions UI will wrap the files in a zip file. This zip file contains the files of the stream where each part is 256MB in size, except the last part. 
+GitHub Actions UI will wrap the files in a zip file. This zip file contains the files of the stream where each part is 256MB in size, except the last part.
 
 It's possible to combine these to a stream with `unzip -p file.zip` command and process them locally too.
 
