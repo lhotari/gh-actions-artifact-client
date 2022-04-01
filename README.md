@@ -5,8 +5,16 @@ Provides command line access to GitHub Actions Artifact upload / download.
 The benefit is that any command can be used to produce the artifact and any command can be used to consume the artifact.
 
 The upload is streamed from stdin and the download is streamed to stdout.
-
 This makes it possible to use `docker save` and `docker load` to work efficiently with GitHub Actions Artifacts.
+
+### Limitation: Download command supports only downloading artifacts uploaded with the same client
+
+:warning: The download command currently supports only downloading artifacts uploaded with the same client. 
+In uploading, the stream is split into multiple file parts where each part is of the size of 256MB.
+
+The reason for this is the limitation of GitHub Actions Artifacts where the uploaded files must have a predefined size. The streaming will buffer into memory so that parts are fully contained before they are uploaded. Uploading and downloading requires about 600MB RAM with the default settings.
+
+The download command downloads part001, part002, part003, ... files and outputs them to stdout after downloading each part to memory.
 
 ### Usage
 
@@ -29,9 +37,30 @@ This is meant to be used only for artifacts that were uploaded in the same forma
 gh-actions-artifact-client.js download artifact_name | some_command
 ```
 
-Uploading and downloading requires about 600MB RAM with the default settings.
-In uploading, the stream is split into multiple file parts where each part is of the size of 256MB.
-The reason for this is the limitation of GitHub Actions Artifacts where the uploaded files must have a predefined size. The streaming will buffer into memory so that parts are fully contained before they are uploaded.
+### Usage tips
+
+You can download artifacts from the GitHub Actions UI after the workflow has finished.
+GitHub Actions UI will wrap the files in a zip file. This zip file contains the files of the stream where each part is 256MB in size, except the last part. 
+
+It's possible to combine these to a stream with `unzip -p file.zip` command and process them locally too.
+
+For example, if these commands were used in a GitHub Actions Workflow to share files:
+
+uploading
+```
+tar -I zstd -cf - -C /some/directory . | gh-actions-artifact-client.js upload files.tar.zst
+```
+downloading
+```
+gh-actions-artifact-client.js download files.tar.zst | tar -I zstd -xf - -C /some/directory
+```
+
+This would be the way to extract the files by downloading the artifact as a zip file in GitHub Actions UI and then entering these commands:
+
+```
+unzip -p ~/Downloads/files.tar.zst.zip | tar -I zstd -xf - -C /some/directory
+```
+
 
 ### Development testing
 
