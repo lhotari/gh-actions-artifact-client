@@ -20,7 +20,7 @@ The download command downloads part001, part002, part003, ... files and outputs 
 
 It is necessary to set up the required tokens and script once in a build job:
 ```yaml
-- uses: lhotari/gh-actions-artifact-client@master
+- uses: lhotari/gh-actions-artifact-client@v1
 ```
 
 After this, `gh-actions-artifact-client.js` will be available in run scripts.
