@@ -33,7 +33,7 @@
     "@babel/preset-env": "^7.16.11",
     "@vercel/ncc": "^0.33.4",
     "babel-jest": "^27.5.1",
-    "eslint": "^8.13.0",
+    "eslint": "^8.21.0",
     "eslint-plugin-jest": "^26.1.4",
     "jest": "^27.5.1",
     "js-yaml": "^4.1.0",
