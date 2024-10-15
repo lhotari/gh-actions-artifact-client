@@ -52,7 +52,6 @@ async function uploadStream(name, inputStream, options) {
   const abortController = new AbortController();
 
   const uploadCallback = (progress) => {
-    core.info(`Uploaded bytes ${progress.loadedBytes}`);
     uploadByteCount = progress.loadedBytes;
     lastProgressTime = Date.now();
   };
