@@ -6,9 +6,15 @@ on: # rebuild any PRs and main branch changes
       - main
       - master
       - 'releases/*'
-
 jobs:
-  test: # make sure the action works on a clean machine without building
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npm install
+          npm test
+  integration-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
