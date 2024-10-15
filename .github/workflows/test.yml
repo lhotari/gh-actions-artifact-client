@@ -4,21 +4,29 @@ on: # rebuild any PRs and main branch changes
   push:
     branches:
       - main
+      - master
       - 'releases/*'
 
 jobs:
-  build: # make sure build/ci work properly
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: |
-          npm install
-      - run: |
-          npm run all
   test: # make sure the action works on a clean machine without building
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./
-        with:
-          milliseconds: 1000
+      - uses: actions/checkout@v4
+      - uses: ./dist/.
+      - run: |
+          # Test upload
+          echo "Hello, world!" | gh-actions-artifact-client.js upload test
+          # Test download
+          downloaded=$(gh-actions-artifact-client.js download test)
+          echo $downloaded
+          if [ "$downloaded" != "Hello, world!" ]; then
+            echo "Downloaded content does not match uploaded content"
+            exit 1
+          fi
+          # Test upload with different name
+          echo "Another test" | gh-actions-artifact-client.js upload test2
+          # Test download
+          echo "Downloaded content: $(gh-actions-artifact-client.js download test2)"
+          # Test delete
+          gh-actions-artifact-client.js delete test2
+          echo "Deleted test2"
