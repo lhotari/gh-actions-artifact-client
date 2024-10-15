@@ -25,7 +25,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@actions/artifact": "^1.0.0",
+    "@actions/artifact": "^2.1.11",
     "yargs": "^17.4.1"
   },
   "devDependencies": {
