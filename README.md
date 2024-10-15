@@ -1,4 +1,4 @@
-# GitHub Actions Artifact client
+# GitHub Actions Artifact client v2
 
 Provides command line access to GitHub Actions Artifact upload / download.
 
@@ -11,7 +11,7 @@ This makes it possible to use `docker save` and `docker load` to work efficientl
 
 It is necessary to set up the required tokens and script once in a build job:
 ```yaml
-- uses: lhotari/gh-actions-artifact-client@v1
+- uses: lhotari/gh-actions-artifact-client@v2
 ```
 
 After this, `gh-actions-artifact-client.js` will be available in run scripts.
