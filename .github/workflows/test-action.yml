@@ -11,6 +11,8 @@ on:
           - 'master'
         default: v2
   push:
+    branches:
+      - master
     tags:
       - v2
 
@@ -20,14 +22,14 @@ concurrency:
 
 jobs:
   integration-test:
-    name: "integration-test for ${{ github.event.inputs.action_tag || 'v2' }}"
+    name: "integration-test for ${{ github.event.inputs.action_tag || github.ref_name }}"
     runs-on: ubuntu-latest
     steps:
       # test master branch or v2 tag. uses doesn't support a dynamic parameter
       - uses: lhotari/gh-actions-artifact-client@master
-        if: ${{ github.event.inputs.action_tag == 'master' }}
+        if: ${{ github.event.inputs.action_tag == 'master' || github.ref_name == 'master' }}
       - uses: lhotari/gh-actions-artifact-client@v2
-        if: ${{ github.event.inputs.action_tag != 'master' }}
+        if: ${{ github.event.inputs.action_tag == 'v2' || github.ref_name == 'v2' }}
       - run: |
           # Test upload
           echo "Hello, world!" | gh-actions-artifact-client.js upload test
