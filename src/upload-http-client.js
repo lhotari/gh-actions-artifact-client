@@ -1,16 +1,10 @@
-const {
-  validateArtifactName
-} = require('@actions/artifact/lib/internal/upload/path-and-artifact-name-validation')
+const {validateArtifactName} = require('@actions/artifact/lib/internal/upload/path-and-artifact-name-validation')
 const stream = require('stream')
 const crypto = require('crypto')
 const core = require('@actions/core')
 const {BlobClient} = require('@azure/storage-blob')
-const {
-  internalArtifactTwirpClient
-} = require('@actions/artifact/lib/internal/shared/artifact-twirp-client')
-const {
-  getBackendIdsFromToken
-} = require('@actions/artifact/lib/internal/shared/util')
+const {internalArtifactTwirpClient} = require('@actions/artifact/lib/internal/shared/artifact-twirp-client')
+const {getBackendIdsFromToken} = require('@actions/artifact/lib/internal/shared/util')
 const errors = require('@actions/artifact/lib/internal/shared/errors')
 const {StringValue} = require('@actions/artifact/lib/generated')
 const config = require('@actions/artifact/lib/internal/shared/config')
@@ -41,12 +35,9 @@ async function uploadStream(name, inputStream, options) {
     createArtifactReq.expiresAt = retention.getExpiration(retentionDays)
   }
 
-  const createArtifactResp =
-    await artifactClient.CreateArtifact(createArtifactReq)
+  const createArtifactResp = await artifactClient.CreateArtifact(createArtifactReq)
   if (!createArtifactResp.ok) {
-    throw new errors.InvalidResponseError(
-      'CreateArtifact: response from backend was not ok'
-    )
+    throw new errors.InvalidResponseError('CreateArtifact: response from backend was not ok')
   }
 
   const signedUploadUrl = createArtifactResp.signedUploadUrl
@@ -79,18 +70,9 @@ async function uploadStream(name, inputStream, options) {
 
   core.info('Beginning upload of artifact content to blob storage')
 
-  const timerPromise = chunkTimer(
-    config.getUploadChunkTimeout(),
-    () => lastProgressTime,
-    abortController
-  )
+  const timerPromise = chunkTimer(config.getUploadChunkTimeout(), () => lastProgressTime, abortController)
   try {
-    const uploadPromise = blockBlobClient.uploadStream(
-      uploadStream,
-      bufferSize,
-      maxConcurrency,
-      uploadOptions
-    )
+    const uploadPromise = blockBlobClient.uploadStream(uploadStream, bufferSize, maxConcurrency, uploadOptions)
     await Promise.race([uploadPromise, timerPromise])
   } catch (error) {
     if (errors.NetworkError.isNetworkErrorCode(error.code)) {
@@ -110,9 +92,7 @@ async function uploadStream(name, inputStream, options) {
   core.info(`SHA256 hash of uploaded artifact zip is ${sha256Hash}`)
 
   if (uploadByteCount === 0) {
-    core.warning(
-      `No data was uploaded to blob storage. Reported upload byte count is 0.`
-    )
+    core.warning(`No data was uploaded to blob storage. Reported upload byte count is 0.`)
   }
 
   // Finalize the artifact
@@ -130,18 +110,13 @@ async function uploadStream(name, inputStream, options) {
   }
 
   core.info(`Finalizing artifact upload for ${name}`)
-  const finalizeArtifactResp =
-    await artifactClient.FinalizeArtifact(finalizeArtifactReq)
+  const finalizeArtifactResp = await artifactClient.FinalizeArtifact(finalizeArtifactReq)
   if (!finalizeArtifactResp.ok) {
-    throw new errors.InvalidResponseError(
-      'FinalizeArtifact: response from backend was not ok'
-    )
+    throw new errors.InvalidResponseError('FinalizeArtifact: response from backend was not ok')
   }
 
   const artifactId = finalizeArtifactResp.artifactId
-  core.info(
-    `Artifact ${name} successfully finalized. Artifact ID ${artifactId}`
-  )
+  core.info(`Artifact ${name} successfully finalized. Artifact ID ${artifactId}`)
 
   return {
     size: uploadByteCount,

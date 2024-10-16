@@ -12,8 +12,7 @@ test('delete artifact test', async () => {
   process.env.ACTIONS_RESULTS_URL = 'http://localhost:12345/results'
   process.env.GITHUB_RUN_ID = '123'
 
-  const {workflowRunBackendId, workflowJobRunBackendId} =
-    getBackendIdsFromToken()
+  const {workflowRunBackendId, workflowJobRunBackendId} = getBackendIdsFromToken()
 
   const artifactName = 'test'
   const artifactId = '12345'
@@ -21,26 +20,22 @@ test('delete artifact test', async () => {
   const mockserver = nock('http://localhost:12345').persist()
 
   // Mock ListArtifacts endpoint
-  mockserver
-    .post('/twirp/github.actions.results.api.v1.ArtifactService/ListArtifacts')
-    .reply(200, {
-      artifacts: [
-        {
-          name: artifactName,
-          workflowRunBackendId: workflowRunBackendId,
-          workflowJobRunBackendId: workflowJobRunBackendId,
-          databaseId: artifactId
-        }
-      ]
-    })
+  mockserver.post('/twirp/github.actions.results.api.v1.ArtifactService/ListArtifacts').reply(200, {
+    artifacts: [
+      {
+        name: artifactName,
+        workflowRunBackendId: workflowRunBackendId,
+        workflowJobRunBackendId: workflowJobRunBackendId,
+        databaseId: artifactId
+      }
+    ]
+  })
 
   // Mock DeleteArtifact endpoint
-  mockserver
-    .post('/twirp/github.actions.results.api.v1.ArtifactService/DeleteArtifact')
-    .reply(200, {
-      ok: true,
-      artifactId: artifactId
-    })
+  mockserver.post('/twirp/github.actions.results.api.v1.ArtifactService/DeleteArtifact').reply(200, {
+    ok: true,
+    artifactId: artifactId
+  })
 
   const result = await deleteArtifact(artifactName)
 

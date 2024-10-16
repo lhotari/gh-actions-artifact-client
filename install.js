@@ -4,29 +4,17 @@ const path = require('path')
 // Installs the gh-actions-artifact-client.js file into a local directory
 // and adds it to the GITHUB_PATH.
 async function run() {
-  const localBinPath = path.resolve(
-    process.env.RUNNER_TEMP,
-    '_github_home/.local/bin'
-  )
+  const localBinPath = path.resolve(process.env.RUNNER_TEMP, '_github_home/.local/bin')
   fs.mkdirSync(localBinPath, {recursive: true})
-  const clientJsPath = path.resolve(
-    localBinPath,
-    'gh-actions-artifact-client.js'
-  )
+  const clientJsPath = path.resolve(localBinPath, 'gh-actions-artifact-client.js')
   let clientJsContent
   try {
     // If dist/index.js exists, use it
-    clientJsContent = fs.readFileSync(
-      path.resolve(__dirname, 'dist/index.js'),
-      'UTF-8'
-    )
+    clientJsContent = fs.readFileSync(path.resolve(__dirname, 'dist/index.js'), 'UTF-8')
   } catch (error) {
     if (error.code === 'ENOENT') {
       // If dist/index.js doesn't exist, look for index.js
-      clientJsContent = fs.readFileSync(
-        path.resolve(__dirname, 'index.js'),
-        'UTF-8'
-      )
+      clientJsContent = fs.readFileSync(path.resolve(__dirname, 'index.js'), 'UTF-8')
     } else {
       throw error
     }

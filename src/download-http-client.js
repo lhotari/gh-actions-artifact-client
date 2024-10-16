@@ -1,23 +1,14 @@
 const core = require('@actions/core')
-const {
-  internalArtifactTwirpClient
-} = require('@actions/artifact/lib/internal/shared/artifact-twirp-client')
+const {internalArtifactTwirpClient} = require('@actions/artifact/lib/internal/shared/artifact-twirp-client')
 const {StringValue} = require('@actions/artifact/lib/generated')
-const {
-  getBackendIdsFromToken
-} = require('@actions/artifact/lib/internal/shared/util')
-const {
-  ArtifactNotFoundError
-} = require('@actions/artifact/lib/internal/shared/errors')
+const {getBackendIdsFromToken} = require('@actions/artifact/lib/internal/shared/util')
+const {ArtifactNotFoundError} = require('@actions/artifact/lib/internal/shared/errors')
 const httpClient = require('@actions/http-client')
-const {
-  getUserAgentString
-} = require('@actions/artifact/lib/internal/shared/user-agent')
+const {getUserAgentString} = require('@actions/artifact/lib/internal/shared/user-agent')
 
 async function downloadStream(name, outputStream) {
   const artifactClient = internalArtifactTwirpClient()
-  const {workflowRunBackendId, workflowJobRunBackendId} =
-    getBackendIdsFromToken()
+  const {workflowRunBackendId, workflowJobRunBackendId} = getBackendIdsFromToken()
 
   const listReq = {
     workflowRunBackendId,
@@ -49,16 +40,11 @@ async function downloadStream(name, outputStream) {
   const response = await client.get(signedUrl)
 
   if (response.message.statusCode !== 200) {
-    throw new Error(
-      `Unexpected HTTP response: ${response.message.statusCode} ${response.message.statusMessage}`
-    )
+    throw new Error(`Unexpected HTTP response: ${response.message.statusCode} ${response.message.statusMessage}`)
   }
 
   return new Promise((resolve, reject) => {
-    response.message
-      .pipe(outputStream)
-      .on('finish', resolve)
-      .on('error', reject)
+    response.message.pipe(outputStream).on('finish', resolve).on('error', reject)
   })
 }
 
