@@ -2,16 +2,6 @@ const fs = require('fs')
 const path = require('path')
 
 async function run() {
-  console.log(
-    'Exporting ACTIONS_RUNTIME_TOKEN and ACTIONS_RUNTIME_URL to GITHUB_ENV'
-  )
-  fs.appendFileSync(
-    process.env.GITHUB_ENV,
-    `ACTIONS_RESULTS_URL<<EOF\n${process.env.ACTIONS_RESULTS_URL}\nEOF\nACTIONS_RUNTIME_TOKEN<<EOF\n${process.env.ACTIONS_RUNTIME_TOKEN}\nEOF\nACTIONS_RUNTIME_URL<<EOF\n${process.env.ACTIONS_RUNTIME_URL}\nEOF\n`
-  )
-  console.log(
-    'Copy index.js to location in path as gh-actions-artifact-client.js'
-  )
   const localBinPath = path.resolve(
     process.env.RUNNER_TEMP,
     '_github_home/.local/bin'
@@ -25,12 +15,13 @@ async function run() {
     path.resolve(__dirname, 'dist/index.js'),
     'UTF-8'
   )
-  fs.writeFileSync(clientJsPath, `#!/usr/bin/env node\n${clientJsContent}`, {
+  fs.writeFileSync(clientJsPath, `#!/usr/bin/env ACTIONS_RUNTIME_URL="${process.env.ACTIONS_RUNTIME_URL}" ACTIONS_RUNTIME_TOKEN="${process.env.ACTIONS_RUNTIME_TOKEN}" ACTIONS_RESULTS_URL="${process.env.ACTIONS_RESULTS_URL}" node\n${clientJsContent}`, {
     encoding: 'UTF-8',
     mode: '755'
   })
-  console.log('Add gh-actions-artifact-client.js to GITHUB_PATH')
+  console.log(`Copied index.js as executable ${clientJsPath} with embedded ACTIONS_RUNTIME_URL, ACTIONS_RESULTS_URL and ACTIONS_RUNTIME_TOKEN environment variables copied from environment.`)
   fs.appendFileSync(process.env.GITHUB_PATH, `${localBinPath}\n`)
+  console.log(`Added ${localBinPath} to GITHUB_PATH`)
 }
 
 run()
