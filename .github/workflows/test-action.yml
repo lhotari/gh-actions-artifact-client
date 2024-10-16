@@ -5,7 +5,10 @@ on:
       action_tag:
         description: 'Tag of the action to test'
         required: true
-        type: string
+        type: choice
+        options:
+          - 'v2'
+          - 'master'
         default: v2
   push:
     tags:
@@ -20,7 +23,11 @@ jobs:
     name: "integration-test for ${{ github.event.inputs.action_tag || 'v2' }}"
     runs-on: ubuntu-latest
     steps:
-      - uses: "lhotari/gh-actions-artifact-client@${{ github.event.inputs.action_tag || 'v2' }}"
+      # test master branch or v2 tag. uses doesn't support a dynamic parameter
+      - uses: lhotari/gh-actions-artifact-client@master
+        if: ${{ github.event.inputs.action_tag == 'master' }}
+      - uses: lhotari/gh-actions-artifact-client@v2
+        if: ${{ github.event.inputs.action_tag != 'master' }}
       - run: |
           # Test upload
           echo "Hello, world!" | gh-actions-artifact-client.js upload test
