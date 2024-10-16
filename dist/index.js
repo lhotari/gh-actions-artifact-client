@@ -78894,7 +78894,8 @@ module.exports = parseParams
           description: 'retention days',
           type: 'number',
           default: 1
-        }).option('contentType', {
+        })
+        .option('contentType', {
           description: 'Content type',
           type: 'string',
           default: 'application/octet-stream'
@@ -78939,39 +78940,52 @@ module.exports = parseParams
   })
   .help()
   .alias('help', 'h').argv
-  
+
 
 /***/ }),
 
 /***/ 8744:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const { debug, info } = __nccwpck_require__(7484);
-const { internalArtifactTwirpClient } = __nccwpck_require__(7417);
-const { getBackendIdsFromToken } = __nccwpck_require__(4012);
-const { StringValue } = __nccwpck_require__(4216);
-const { ArtifactNotFoundError } = __nccwpck_require__(5655);
+const {debug, info} = __nccwpck_require__(7484)
+const {
+  internalArtifactTwirpClient
+} = __nccwpck_require__(7417)
+const {
+  getBackendIdsFromToken
+} = __nccwpck_require__(4012)
+const {StringValue} = __nccwpck_require__(4216)
+const {
+  ArtifactNotFoundError
+} = __nccwpck_require__(5655)
 
 async function deleteArtifact(artifactName) {
-  const artifactClient = internalArtifactTwirpClient();
-  const { workflowRunBackendId, workflowJobRunBackendId } = getBackendIdsFromToken();
+  const artifactClient = internalArtifactTwirpClient()
+  const {workflowRunBackendId, workflowJobRunBackendId} =
+    getBackendIdsFromToken()
 
   // List artifacts to find the one we want to delete
   const listReq = {
     workflowRunBackendId,
     workflowJobRunBackendId,
-    nameFilter: StringValue.create({ value: artifactName })
-  };
-  const listRes = await artifactClient.ListArtifacts(listReq);
+    nameFilter: StringValue.create({value: artifactName})
+  }
+  const listRes = await artifactClient.ListArtifacts(listReq)
 
   if (listRes.artifacts.length === 0) {
-    throw new ArtifactNotFoundError(`Artifact not found for name: ${artifactName}`);
+    throw new ArtifactNotFoundError(
+      `Artifact not found for name: ${artifactName}`
+    )
   }
 
-  let artifact = listRes.artifacts[0];
+  let artifact = listRes.artifacts[0]
   if (listRes.artifacts.length > 1) {
-    artifact = listRes.artifacts.sort((a, b) => Number(b.databaseId) - Number(a.databaseId))[0];
-    debug(`More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`);
+    artifact = listRes.artifacts.sort(
+      (a, b) => Number(b.databaseId) - Number(a.databaseId)
+    )[0]
+    debug(
+      `More than one artifact found for a single name, returning newest (id: ${artifact.databaseId})`
+    )
   }
 
   // Delete the artifact
@@ -78979,19 +78993,19 @@ async function deleteArtifact(artifactName) {
     workflowRunBackendId: artifact.workflowRunBackendId,
     workflowJobRunBackendId: artifact.workflowJobRunBackendId,
     name: artifact.name
-  };
-  const deleteRes = await artifactClient.DeleteArtifact(deleteReq);
+  }
+  const deleteRes = await artifactClient.DeleteArtifact(deleteReq)
 
-  info(`Artifact '${artifactName}' (ID: ${deleteRes.artifactId}) deleted`);
+  info(`Artifact '${artifactName}' (ID: ${deleteRes.artifactId}) deleted`)
 
   return {
     artifactId: Number(deleteRes.artifactId)
-  };
+  }
 }
 
 module.exports = {
   deleteArtifact
-};
+}
 
 
 /***/ }),
@@ -78999,62 +79013,73 @@ module.exports = {
 /***/ 9247:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const core = __nccwpck_require__(7484);
-const { internalArtifactTwirpClient } = __nccwpck_require__(7417);
-const { StringValue } = __nccwpck_require__(4216);
-const { getBackendIdsFromToken } = __nccwpck_require__(4012);
-const { ArtifactNotFoundError } = __nccwpck_require__(5655);
-const httpClient = __nccwpck_require__(4844);
-const { getUserAgentString } = __nccwpck_require__(9387);
+const core = __nccwpck_require__(7484)
+const {
+  internalArtifactTwirpClient
+} = __nccwpck_require__(7417)
+const {StringValue} = __nccwpck_require__(4216)
+const {
+  getBackendIdsFromToken
+} = __nccwpck_require__(4012)
+const {
+  ArtifactNotFoundError
+} = __nccwpck_require__(5655)
+const httpClient = __nccwpck_require__(4844)
+const {
+  getUserAgentString
+} = __nccwpck_require__(9387)
 
 async function downloadStream(name, outputStream) {
-  const artifactClient = internalArtifactTwirpClient();
-  const { workflowRunBackendId, workflowJobRunBackendId } = getBackendIdsFromToken();
+  const artifactClient = internalArtifactTwirpClient()
+  const {workflowRunBackendId, workflowJobRunBackendId} =
+    getBackendIdsFromToken()
 
   const listReq = {
     workflowRunBackendId,
     workflowJobRunBackendId,
-    nameFilter: StringValue.create({ value: name })
-  };
+    nameFilter: StringValue.create({value: name})
+  }
 
-  const { artifacts } = await artifactClient.ListArtifacts(listReq);
+  const {artifacts} = await artifactClient.ListArtifacts(listReq)
 
   if (artifacts.length === 0) {
-    throw new ArtifactNotFoundError(`No artifacts found with name: ${name}`);
+    throw new ArtifactNotFoundError(`No artifacts found with name: ${name}`)
   }
 
   if (artifacts.length > 1) {
-    core.warning('Multiple artifacts found, defaulting to first.');
+    core.warning('Multiple artifacts found, defaulting to first.')
   }
 
   const signedReq = {
     workflowRunBackendId: artifacts[0].workflowRunBackendId,
     workflowJobRunBackendId: artifacts[0].workflowJobRunBackendId,
     name: artifacts[0].name
-  };
+  }
 
-  const { signedUrl } = await artifactClient.GetSignedArtifactURL(signedReq);
+  const {signedUrl} = await artifactClient.GetSignedArtifactURL(signedReq)
 
-  core.info(`Downloading artifact from: ${new URL(signedUrl).origin}`);
+  core.info(`Downloading artifact from: ${new URL(signedUrl).origin}`)
 
-  const client = new httpClient.HttpClient(getUserAgentString());
-  const response = await client.get(signedUrl);
+  const client = new httpClient.HttpClient(getUserAgentString())
+  const response = await client.get(signedUrl)
 
   if (response.message.statusCode !== 200) {
-    throw new Error(`Unexpected HTTP response: ${response.message.statusCode} ${response.message.statusMessage}`);
+    throw new Error(
+      `Unexpected HTTP response: ${response.message.statusCode} ${response.message.statusMessage}`
+    )
   }
 
   return new Promise((resolve, reject) => {
     response.message
       .pipe(outputStream)
       .on('finish', resolve)
-      .on('error', reject);
-  });
+      .on('error', reject)
+  })
 }
 
 module.exports = {
   downloadStream
-};
+}
 
 
 /***/ }),
@@ -79062,30 +79087,36 @@ module.exports = {
 /***/ 6038:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const { validateArtifactName } = __nccwpck_require__(9190);
-const stream = __nccwpck_require__(2203);
-const crypto = __nccwpck_require__(6982);
-const core = __nccwpck_require__(7484);
-const { BlobClient } = __nccwpck_require__(1012);
-const { internalArtifactTwirpClient } = __nccwpck_require__(7417);
-const { getBackendIdsFromToken } = __nccwpck_require__(4012);
-const errors = __nccwpck_require__(5655);
-const { StringValue } = __nccwpck_require__(4216);
-const config = __nccwpck_require__(2938);
-const retention = __nccwpck_require__(4871);
+const {
+  validateArtifactName
+} = __nccwpck_require__(9190)
+const stream = __nccwpck_require__(2203)
+const crypto = __nccwpck_require__(6982)
+const core = __nccwpck_require__(7484)
+const {BlobClient} = __nccwpck_require__(1012)
+const {
+  internalArtifactTwirpClient
+} = __nccwpck_require__(7417)
+const {
+  getBackendIdsFromToken
+} = __nccwpck_require__(4012)
+const errors = __nccwpck_require__(5655)
+const {StringValue} = __nccwpck_require__(4216)
+const config = __nccwpck_require__(2938)
+const retention = __nccwpck_require__(4871)
 
 async function uploadStream(name, inputStream, options) {
-  validateArtifactName(name);
+  validateArtifactName(name)
 
-  const { retentionDays, contentType } = options;
+  const {retentionDays, contentType} = options
 
-  core.info(`Starting artifact upload for ${name}`);
+  core.info(`Starting artifact upload for ${name}`)
 
   // Get the backend IDs
-  const backendIds = getBackendIdsFromToken();
+  const backendIds = getBackendIdsFromToken()
 
   // Create the artifact client
-  const artifactClient = internalArtifactTwirpClient();
+  const artifactClient = internalArtifactTwirpClient()
 
   // Create the artifact
   const createArtifactReq = {
@@ -79093,70 +79124,84 @@ async function uploadStream(name, inputStream, options) {
     workflowJobRunBackendId: backendIds.workflowJobRunBackendId,
     name,
     version: 4
-  };
+  }
 
   if (retentionDays) {
-    createArtifactReq.expiresAt = retention.getExpiration(retentionDays);
+    createArtifactReq.expiresAt = retention.getExpiration(retentionDays)
   }
 
-  const createArtifactResp = await artifactClient.CreateArtifact(createArtifactReq);
+  const createArtifactResp =
+    await artifactClient.CreateArtifact(createArtifactReq)
   if (!createArtifactResp.ok) {
-    throw new errors.InvalidResponseError('CreateArtifact: response from backend was not ok');
+    throw new errors.InvalidResponseError(
+      'CreateArtifact: response from backend was not ok'
+    )
   }
 
-  const signedUploadUrl = createArtifactResp.signedUploadUrl;
-  const blobClient = new BlobClient(signedUploadUrl);
-  const blockBlobClient = blobClient.getBlockBlobClient();  
+  const signedUploadUrl = createArtifactResp.signedUploadUrl
+  const blobClient = new BlobClient(signedUploadUrl)
+  const blockBlobClient = blobClient.getBlockBlobClient()
 
-  const maxConcurrency = config.getConcurrency();
-  const bufferSize = config.getUploadChunkSize();
+  const maxConcurrency = config.getConcurrency()
+  const bufferSize = config.getUploadChunkSize()
 
-  let uploadByteCount = 0;
-  let lastProgressTime = Date.now();
-  const abortController = new AbortController();
+  let uploadByteCount = 0
+  let lastProgressTime = Date.now()
+  const abortController = new AbortController()
 
-  const uploadCallback = (progress) => {
-    uploadByteCount = progress.loadedBytes;
-    lastProgressTime = Date.now();
-  };
+  const uploadCallback = progress => {
+    uploadByteCount = progress.loadedBytes
+    lastProgressTime = Date.now()
+  }
 
   const uploadOptions = {
-    blobHTTPHeaders: { blobContentType: contentType },
+    blobHTTPHeaders: {blobContentType: contentType},
     onProgress: uploadCallback,
     abortSignal: abortController.signal
-  };
-
-  const uploadStream = new stream.PassThrough();
-  const hashStream = crypto.createHash('sha256');
-
-  inputStream.pipe(uploadStream);
-  inputStream.pipe(hashStream).setEncoding('hex');
-
-  core.info('Beginning upload of artifact content to blob storage');
-
-  const timerPromise = chunkTimer(config.getUploadChunkTimeout(), () => lastProgressTime, abortController);
-  try {
-    const uploadPromise = blockBlobClient.uploadStream(uploadStream, bufferSize, maxConcurrency, uploadOptions);
-    await Promise.race([uploadPromise, timerPromise]);
-  } catch (error) {
-    if (errors.NetworkError.isNetworkErrorCode(error.code)) {
-      throw new errors.NetworkError(error.code);
-    }
-    throw error;
-  } finally {
-    abortController.abort(); // Ensure everything is cleaned up
-    await timerPromise;
   }
 
-  core.info('Finished uploading artifact content to blob storage!');
-  
-  hashStream.end();
-  const sha256Hash = hashStream.read();
+  const uploadStream = new stream.PassThrough()
+  const hashStream = crypto.createHash('sha256')
 
-  core.info(`SHA256 hash of uploaded artifact zip is ${sha256Hash}`);
+  inputStream.pipe(uploadStream)
+  inputStream.pipe(hashStream).setEncoding('hex')
+
+  core.info('Beginning upload of artifact content to blob storage')
+
+  const timerPromise = chunkTimer(
+    config.getUploadChunkTimeout(),
+    () => lastProgressTime,
+    abortController
+  )
+  try {
+    const uploadPromise = blockBlobClient.uploadStream(
+      uploadStream,
+      bufferSize,
+      maxConcurrency,
+      uploadOptions
+    )
+    await Promise.race([uploadPromise, timerPromise])
+  } catch (error) {
+    if (errors.NetworkError.isNetworkErrorCode(error.code)) {
+      throw new errors.NetworkError(error.code)
+    }
+    throw error
+  } finally {
+    abortController.abort() // Ensure everything is cleaned up
+    await timerPromise
+  }
+
+  core.info('Finished uploading artifact content to blob storage!')
+
+  hashStream.end()
+  const sha256Hash = hashStream.read()
+
+  core.info(`SHA256 hash of uploaded artifact zip is ${sha256Hash}`)
 
   if (uploadByteCount === 0) {
-    core.warning(`No data was uploaded to blob storage. Reported upload byte count is 0.`);
+    core.warning(
+      `No data was uploaded to blob storage. Reported upload byte count is 0.`
+    )
   }
 
   // Finalize the artifact
@@ -79165,53 +79210,63 @@ async function uploadStream(name, inputStream, options) {
     workflowJobRunBackendId: backendIds.workflowJobRunBackendId,
     name,
     size: uploadByteCount.toString()
-  };
+  }
 
   if (sha256Hash) {
     finalizeArtifactReq.hash = StringValue.create({
       value: `sha256:${sha256Hash}`
-    });
+    })
   }
 
-  core.info(`Finalizing artifact upload for ${name}`);
-  const finalizeArtifactResp = await artifactClient.FinalizeArtifact(finalizeArtifactReq);
+  core.info(`Finalizing artifact upload for ${name}`)
+  const finalizeArtifactResp =
+    await artifactClient.FinalizeArtifact(finalizeArtifactReq)
   if (!finalizeArtifactResp.ok) {
-    throw new errors.InvalidResponseError('FinalizeArtifact: response from backend was not ok');
+    throw new errors.InvalidResponseError(
+      'FinalizeArtifact: response from backend was not ok'
+    )
   }
 
-  const artifactId = finalizeArtifactResp.artifactId;
-  core.info(`Artifact ${name} successfully finalized. Artifact ID ${artifactId}`);
+  const artifactId = finalizeArtifactResp.artifactId
+  core.info(
+    `Artifact ${name} successfully finalized. Artifact ID ${artifactId}`
+  )
 
   return {
     size: uploadByteCount,
     sha256: sha256Hash,
     name: name,
     id: Number(artifactId)
-  };
+  }
 }
 
 function chunkTimer(interval, getLastProgressTime, abortController) {
   return new Promise((resolve, reject) => {
     const checkProgress = () => {
       if (Date.now() - getLastProgressTime() > interval) {
-        clearInterval(timer);
-        reject(new Error('Upload progress stalled.'));
-        abortController.abort();
+        clearInterval(timer)
+        reject(new Error('Upload progress stalled.'))
+        abortController.abort()
       }
-    };
+    }
 
-    const timer = setInterval(checkProgress, 1000); // Check every second
+    const timer = setInterval(checkProgress, 1000) // Check every second
 
-    abortController.signal.addEventListener('abort', () => {
-      clearInterval(timer);
-      resolve();
-    }, { once: true });
-  });
+    abortController.signal.addEventListener(
+      'abort',
+      () => {
+        clearInterval(timer)
+        resolve()
+      },
+      {once: true}
+    )
+  })
 }
 
 module.exports = {
   uploadStream
-};
+}
+
 
 /***/ }),
 
