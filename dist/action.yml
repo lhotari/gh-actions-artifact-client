@@ -1,8 +1,0 @@
-name: 'GitHub Actions Artifact CLI client'
-description: 'command line client to GitHub Actions Artifacts that supports upload and download using stdin/stdout'
-author: 'Lari Hotari'
-branding:
-  icon: 'terminal'
-runs:
-  using: 'node20'
-  main: 'install.js'
