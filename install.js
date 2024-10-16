@@ -15,7 +15,11 @@ async function run() {
     path.resolve(__dirname, 'dist/index.js'),
     'UTF-8'
   )
-  fs.writeFileSync(clientJsPath, `#!/usr/bin/env ACTIONS_RUNTIME_URL="${process.env.ACTIONS_RUNTIME_URL}" ACTIONS_RUNTIME_TOKEN="${process.env.ACTIONS_RUNTIME_TOKEN}" ACTIONS_RESULTS_URL="${process.env.ACTIONS_RESULTS_URL}" node\n${clientJsContent}`, {
+  fs.writeFileSync(clientJsPath, `#!/usr/bin/env node
+process.env.ACTIONS_RUNTIME_URL='${process.env.ACTIONS_RUNTIME_URL}'
+process.env.ACTIONS_RUNTIME_TOKEN='${process.env.ACTIONS_RUNTIME_TOKEN}'
+process.env.ACTIONS_RESULTS_URL='${process.env.ACTIONS_RESULTS_URL}'
+${clientJsContent}`, {
     encoding: 'UTF-8',
     mode: '755'
   })
