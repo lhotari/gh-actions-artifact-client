@@ -1,5 +1,5 @@
-name: 'GitHub Actions Artifact client'
-description: 'Install command line GitHub Actions Artifact client'
+name: 'GitHub Actions Artifact CLI client'
+description: 'command line client to GitHub Actions Artifacts that supports upload and download using stdin/stdout'
 author: 'Lari Hotari'
 branding:
   icon: 'terminal'
