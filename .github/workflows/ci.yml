@@ -26,9 +26,9 @@ jobs:
       - uses: ./.
       - run: |
           # Test upload
-          echo "Hello, world!" | gh-actions-artifact-client.js upload test
+          echo "Hello, world!" | gh-actions-artifact-client.js upload --contentType=text/plain hello.txt
           # Test download
-          downloaded=$(gh-actions-artifact-client.js download test)
+          downloaded=$(gh-actions-artifact-client.js download hello.txt)
           echo $downloaded
           if [ "$downloaded" != "Hello, world!" ]; then
             echo "Downloaded content does not match uploaded content"
