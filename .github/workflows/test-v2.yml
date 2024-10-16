@@ -1,0 +1,28 @@
+name: 'test-v2'
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v2
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: lhotari/gh-actions-artifact-client@v2
+      - run: |
+          # Test upload
+          echo "Hello, world!" | gh-actions-artifact-client.js upload test
+          # Test download
+          downloaded=$(gh-actions-artifact-client.js download test)
+          echo $downloaded
+          if [ "$downloaded" != "Hello, world!" ]; then
+            echo "Downloaded content does not match uploaded content"
+            exit 1
+          fi
+          # Test upload with different name
+          echo "Another test" | gh-actions-artifact-client.js upload test2
+          # Test download
+          echo "Downloaded content: $(gh-actions-artifact-client.js download test2)"
+          # Test delete
+          gh-actions-artifact-client.js delete test2
+          echo "Deleted test2"
