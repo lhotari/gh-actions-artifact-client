@@ -14,7 +14,8 @@ require('yargs')
           description: 'retention days',
           type: 'number',
           default: 1
-        }).option('contentType', {
+        })
+        .option('contentType', {
           description: 'Content type',
           type: 'string',
           default: 'application/octet-stream'
@@ -59,4 +60,3 @@ require('yargs')
   })
   .help()
   .alias('help', 'h').argv
-  
