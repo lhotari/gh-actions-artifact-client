@@ -6,6 +6,11 @@ on: # rebuild any PRs and main branch changes
       - main
       - master
       - 'releases/*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   unit-test:
     runs-on: ubuntu-latest
