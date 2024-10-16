@@ -1,19 +1,29 @@
-name: 'test-v2'
-on:
-  workflow_dispatch:
+name: 'CI workflow'
+on: # rebuild any PRs and main branch changes
+  pull_request:
   push:
-    tags:
-      - v2
+    branches:
+      - main
+      - master
+      - 'releases/*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npm install
+          npm test
   integration-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: lhotari/gh-actions-artifact-client@v2
+      - uses: actions/checkout@v4
+      - uses: ./.
       - run: |
           # Test upload
           echo "Hello, world!" | gh-actions-artifact-client.js upload test

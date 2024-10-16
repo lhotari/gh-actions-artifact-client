@@ -1,29 +1,26 @@
-name: 'build-test'
-on: # rebuild any PRs and main branch changes
-  pull_request:
+name: 'Test action'
+on:
+  workflow_dispatch:
+    inputs:
+      action_tag:
+        description: 'Tag of the action to test'
+        required: true
+        type: string
+        default: v2
   push:
-    branches:
-      - main
-      - master
-      - 'releases/*'
+    tags:
+      - v2
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  unit-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          npm install
-          npm test
   integration-test:
+    name: "integration-test for ${{ github.event.inputs.action_tag || 'v2' }}"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.
+      - uses: "lhotari/gh-actions-artifact-client@${{ github.event.inputs.action_tag || 'v2' }}"
       - run: |
           # Test upload
           echo "Hello, world!" | gh-actions-artifact-client.js upload test
