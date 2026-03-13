@@ -10,7 +10,7 @@ if ! grep -q '//#patched' $ACTIONS_CORE_JS_FILE; then
       echo "exports.${key}=(message) => process.stderr.write(message + os.EOL);" >> $ACTIONS_CORE_JS_FILE
   done
 fi
-npm run package
+npm run build
 if [[ "$1" != "--no-commit" ]]; then
   git add dist/* && git commit -m 'Build'
 fi
